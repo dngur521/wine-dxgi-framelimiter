@@ -1,0 +1,35 @@
+#!/bin/sh
+# flwine — run wine with the dxgi frame limiter enabled.
+#
+#   flwine [--fps N] [--exe A.exe[,B.exe]] [--log FILE] [--] <wine arguments...>
+#
+#   --fps N     frame cap (default 60)
+#   --exe LIST  only limit these executables (default: every DXGI program started)
+#   --log FILE  write hook/fps log to this macOS path (fps every 5 s)
+#
+# Uses $WINE if it points to a wine binary (else wine from PATH) and $WINEPREFIX like wine itself.
+FPS=60
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --fps) FPS="$2"; shift 2 ;;
+        --exe) export FL_EXE="$2"; shift 2 ;;
+        --log) export FL_LOG="Z:$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+               FL_LOG=$(printf '%s' "$FL_LOG" | tr '/' '\\'); shift 2 ;;
+        --) shift; break ;;
+        -h|--help) sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) break ;;
+    esac
+done
+[ $# -gt 0 ] || { echo "usage: flwine [--fps N] [--exe A.exe] [--log FILE] <wine args...>"; exit 1; }
+export FL_FPS="$FPS"
+
+if pgrep -f wineserver >/dev/null 2>&1; then
+    echo "flwine: note: a wineserver is already running — if the game is started by an" >&2
+    echo "        already-running Steam, it will NOT see FL_FPS. Quit Steam first." >&2
+fi
+WINE_BIN="${WINE:-}"
+if [ -z "$WINE_BIN" ] || ! command -v "$WINE_BIN" >/dev/null 2>&1; then
+    [ -n "$WINE_BIN" ] && echo "flwine: \$WINE=$WINE_BIN not found, using wine from PATH" >&2
+    WINE_BIN=wine
+fi
+exec "$WINE_BIN" "$@"
